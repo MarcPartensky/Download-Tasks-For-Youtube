@@ -1,0 +1,5 @@
+.vscode
+__pycache__
+videos
+*.mp3
+*.mp4
