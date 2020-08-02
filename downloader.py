@@ -49,7 +49,7 @@ class VideoTasksDownloader:
         return videos
 
     def download(self):
-        """Try to download the videos with youtube dl."""
+        """Try to download the videos with youtube-dl."""
         parsed_videos = self.parsed_videos
         options = self.options
         current_working_directory = os.getcwd()
@@ -58,6 +58,30 @@ class VideoTasksDownloader:
             downloader.download(parsed_videos)
         os.chdir(current_working_directory)
         del self.videos
+
+    def download_terminal(self):
+        """Try to download the videos with youtube-dl by using commands."""
+        while len(self.videos) > 0:
+            video = self.videos[0]
+            cmd = [
+                    'youtube-dl',
+                    '-ciw',
+                    '-x',
+                    '--audio-format',
+                    'mp3',
+                    '--audio-quality',
+                    '0',
+                    '-f',
+                    'bestaudio'
+                    '--embed-thumbnail',
+                    '-o',
+                    "'%(title    )s.%(ext)s'",
+                    '--rm-cache-dir',
+                    video
+                ]
+            cmd = ' '.join(cmd)
+            os.system(cmd)
+            self.videos = self.videos[1:]
 
     def clear_videos_folder(self):
         """Remove all cache and stuff in videos folder."""

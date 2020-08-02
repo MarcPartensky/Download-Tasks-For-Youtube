@@ -29,15 +29,34 @@ class Command:
     def __call__(self, cli, argv):
         """Call the command using a reference to the cli and its parameters by parsing sys.argv."""
         if len(argv[len(self.argv):]) > 0:
+            if self.subcommands:
+                for subcommand in self.subcommands:
+                    if subcommand.match(argv[len(self.argv)]):
+                        return subcommand(argv[len(self.argv)])
             return self.f(cli, *argv[len(self.argv):])
         else:
             return self.f(cli)
 
     def command(self, *argv, aliases:list=[]):
+        """Define a subcommand using its name and aliases."""
+        print(self)
         def decorator(f):
             self.subcommands.append(Command(f, argv, aliases=aliases))
             return f
         return decorator
+
+    def __str__(self):
+        """Return the string representation of the command."""
+        string = f"{' '.join(self.argv)}"
+        if self.aliases:
+            string += f"[{'|'.join(self.aliases)}]"
+        string += f": {self.help()}"
+        # if len(self.subcommands) > 0:
+        #     for subcommand in self.subcommands:
+        #         # print(subcommand)
+        #         string += "\n   "+str(subcommand)
+        print(self.argv, self.subcommands)
+        return string
 
 class Commander:
     """Creator of commands."""
@@ -45,6 +64,7 @@ class Commander:
         """Take the parameters argv and aliases of the command."""
         self.argv = argv
         self.aliases = aliases
+
     def __call__(self, f):
         """Return the command."""
         if len(self.argv)==0: self.argv = (f.__name__, )
@@ -52,17 +72,11 @@ class Commander:
 
 command = Commander
 
-class CommandLineInterface:
-    """Command Line Interface to use the downloader of videos from the terminal."""
-    def __init__(self,
-        downloader:VideoTasksDownloader = VideoTasksDownloader(options.options, options.videos_filename),
-        commands:list = [],
-    ):
-        """Create a downloader."""
-        self.downloader = downloader
+class BaseCommandLineInterface:
+    def __init__(self, commands:list=[]):
+        """Define the list of commands."""
         self.commands = commands
         self.update()
-
 
     def update(self):
         """Use the command line to use the downloader."""
@@ -74,22 +88,33 @@ class CommandLineInterface:
 
     def main(self):
         """Check if there is a matching command and executes it if so."""
-        def f(commands):
-            for command in commands:
-                if command.match(sys.argv[1:]):
-                    command(self, sys.argv[1:])
-                    return
-                f(command.subcommands)
-        f(self.commands)
+        for command in self.commands:
+            if command.match(sys.argv[1:]):
+                return command(self, sys.argv[1:])
         print(
             f"No command named \'{' '.join(sys.argv[1:])}\'."
             f"\nUse the 'help' command to see available commands."
         )
 
+class CommandLineInterface(BaseCommandLineInterface):
+    """Command Line Interface to use the downloader of videos from the terminal."""
+    def __init__(self,
+        downloader:VideoTasksDownloader = VideoTasksDownloader(options.options, options.videos_filename),
+        commands:list = [],
+    ):
+        """Create a downloader."""
+        super().__init__(commands)
+        self.downloader = downloader
+
     @command()
     def download(self):
         """Download the videos."""
         self.downloader.download()
+    
+    @command()
+    def download_terminal(self):
+        """Download the videos using the terminal technique."""
+        self.downloader.download_terminal()
 
     @command()
     def test(self, n=2):
@@ -100,7 +125,7 @@ class CommandLineInterface:
     def list_commands(self):
         """Print all commands."""
         print("Commands:")
-        for command in sorted(self.commands, key=lambda command:command.full_argv):
+        for command in sorted(self.commands, key=lambda command:command.argv):
             print(f"* {command}")
 
     @command('videos', 'filename')
@@ -150,9 +175,7 @@ class CommandLineInterface:
         """Remove all the caches or files that are not videos or musics in the videos folder."""
         raise NotImplemented
         # for file in os.listdir(self.downloader.videos_folder):
-
         #     os.remove(file)
-
 
     @command()
     def task(self):
@@ -169,8 +192,6 @@ class CommandLineInterface:
         """Remove some tasks given their numbers."""
         for number in sorted(numbers, reverse=True):
             pass
-
-
 
 
         
