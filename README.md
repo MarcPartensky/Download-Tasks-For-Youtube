@@ -12,6 +12,6 @@ When you come back your videos and musics will be downloaded and the urls will b
 This program will try to download the videos or musics every 5 minutes or so (you choose by setting up the cron job) until the download is successful.
 
 # Q&A
-* Why not try to make a cron job to download the videos?
+* Why not try to make a cron job to download the videos without this program at all?
 
 => If the download is successful you don't want to download the videos twice or more, that's why there is a task list.
