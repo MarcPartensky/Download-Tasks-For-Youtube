@@ -1,15 +1,16 @@
-import youtube_dl as ytdl
-import json
+# import json
+"""Main class for using tasks to download youtube videos or musics."""
 import os
+import youtube_dl as ytdl
 
 
 class VideoTasksDownloader:
     """Manage task of downloading videos when possible."""
     def __init__(self,
-        options:dict,
-        videos_filename:str="videos.txt",
-        videos_folder:str="videos",
-    ):
+                 options: dict,
+                 videos_filename: str = "videos.txt",
+                 videos_folder: str = "videos",
+                ):
         """Uses the filename of the list of videos."""
         self.options = options
         self.videos_filename = videos_filename
@@ -20,12 +21,12 @@ class VideoTasksDownloader:
         """Get the list of videos."""
         with open(self.videos_filename, 'r') as file:
             video_list = file.read()
-        if video_list=="":
+        if video_list == "":
             return []
         return video_list.split('\n')
 
     @videos.setter
-    def videos(self, video_list:list):
+    def videos(self, video_list: list):
         """Set the list of videos to another."""
         with open(self.videos_filename, 'w') as file:
             file.write('\n'.join(video_list))
@@ -35,7 +36,7 @@ class VideoTasksDownloader:
         """Clear the list of videos."""
         with open(self.videos_filename, 'w'):
             pass
-        
+
     @property
     def parsed_videos(self):
         """Return the videos parsed for youtube-dl format before downloading.
@@ -61,36 +62,39 @@ class VideoTasksDownloader:
 
     def download_terminal(self):
         """Try to download the videos with youtube-dl by using commands."""
-        while len(self.videos) > 0:
-            video = self.videos[0]
+        while len(self.parsed_videos) > 0:
+            video = self.parsed_videos[0]
             cmd = [
-                    'youtube-dl',
-                    '-ciw',
-                    '-x',
-                    '--audio-format',
-                    'mp3',
-                    '--audio-quality',
-                    '0',
-                    '-f',
-                    'bestaudio'
-                    '--embed-thumbnail',
-                    '-o',
-                    "'%(title    )s.%(ext)s'",
-                    '--rm-cache-dir',
-                    video
+                'youtube-dl',
+                '-ciw',
+                '-x',
+                '--audio-format',
+                'mp3',
+                '--audio-quality',
+                '0',
+                '-f',
+                'bestaudio'
+                '--embed-thumbnail',
+                '-o',
+                "'%(title    )s.%(ext)s'",
+                '--rm-cache-dir',
+                video
                 ]
             cmd = ' '.join(cmd)
+            print(cmd)
             os.system(cmd)
+            for file in os.listdir(self.videos_folder):
+                if file.endswith('jpg'):
+                    os.system(
+                        f"ffmpeg -i {file[:-3]}mp3 -i {file} -map_metadata 0 \
+                            -map 0 -map 1 -acodec copy"
+                        )
             self.videos = self.videos[1:]
 
     def clear_videos_folder(self):
         """Remove all cache and stuff in videos folder."""
-        for file in os.listdir(self.videos_folder):
-            pass
+        # for file in os.listdir(self.videos_folder):
+        #     pass
             # if file.endswith('.mp3') or file.endswith('.mp4'):
             #     pass
-
-
-
-
-
+            

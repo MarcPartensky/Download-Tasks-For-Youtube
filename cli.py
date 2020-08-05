@@ -21,6 +21,7 @@ class Command:
         """Check if the sys.argv matches the command."""
         if self.argv == tuple(argv[:len(self.argv)]):
             return True
+        # print(self.aliases, self.argv, argv)
         for alias in self.aliases:
             if alias == argv[0]:
                 return True
@@ -31,17 +32,20 @@ class Command:
         if len(argv[len(self.argv):]) > 0:
             if self.subcommands:
                 for subcommand in self.subcommands:
-                    if subcommand.match(argv[len(self.argv)]):
-                        return subcommand(argv[len(self.argv)])
+                    if subcommand.match(argv[len(self.argv):]):
+                        return subcommand(cli, argv[len(self.argv):])
             return self.f(cli, *argv[len(self.argv):])
         else:
             return self.f(cli)
 
     def command(self, *argv, aliases:list=[]):
         """Define a subcommand using its name and aliases."""
-        print(self)
+        obj = self
         def decorator(f):
-            self.subcommands.append(Command(f, argv, aliases=aliases))
+            # print(obj, obj.subcommands)
+            obj.subcommands.append(Command(f, argv, aliases=aliases))
+            # print("printing self:", self.argv, self.subcommands)
+            # print(f)
             return f
         return decorator
 
@@ -51,11 +55,14 @@ class Command:
         if self.aliases:
             string += f"[{'|'.join(self.aliases)}]"
         string += f": {self.help()}"
+        # print(self.argv)
+        # print(self.subcommands)
+        # # print(id(self))
         # if len(self.subcommands) > 0:
         #     for subcommand in self.subcommands:
         #         # print(subcommand)
         #         string += "\n   "+str(subcommand)
-        print(self.argv, self.subcommands)
+        # print(self.argv, self.subcommands)
         return string
 
 class Commander:
@@ -84,6 +91,7 @@ class BaseCommandLineInterface:
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, Command):
+                # print('update:', value)
                 self.commands.append(value)
 
     def main(self):
@@ -111,8 +119,8 @@ class CommandLineInterface(BaseCommandLineInterface):
         """Download the videos."""
         self.downloader.download()
     
-    @command()
-    def download_terminal(self):
+    @download.command()
+    def terminal(self):
         """Download the videos using the terminal technique."""
         self.downloader.download_terminal()
 
@@ -121,22 +129,30 @@ class CommandLineInterface(BaseCommandLineInterface):
         """Prints n."""
         print(n)
 
-    @command('commands', aliases=['help'])
-    def list_commands(self):
+    @command('commands')
+    def all_commands(self):
         """Print all commands."""
         print("Commands:")
         for command in sorted(self.commands, key=lambda command:command.argv):
             print(f"* {command}")
 
-    @command('videos', 'filename')
-    def videos_filename(self):
-        """Print videos file name."""
-        print(self.downloader.videos_filename)
-
     @command()
-    def number(self):
-        """Print the number of videos to be downloaded."""
-        print(len(self.downloader.videos))
+    def help(self, *argv):
+        """Print help for some commands."""
+        if not argv:
+            print("You must precise the command you need help with.")
+        def find_the_one(commands, argv):
+            for command in commands:
+                if command.match(argv):
+                    if len(argv) > len(command.argv):
+                        found_command = find_the_one(command.subcommands, argv[len(command.argv):])
+                        if found_command: return found_command
+                    return command
+        command = find_the_one(self.commands, argv)
+        if not command:
+            print(f"The command {' '.join(argv)} does not exist.")
+        else:
+            print(f"{' '.join(argv)}:", command.help())
 
     @command()
     def options(self):
@@ -149,60 +165,62 @@ class CommandLineInterface(BaseCommandLineInterface):
     def videos(self):
         """Print all the videos tasks url to download."""
         print("Videos:")
-        for i, video in enumerate(self.downloader.videos):
-            print(f"* {i}: {video}")
+        for file in os.listdir(self.downloader.videos_folder):
+            print(f"* {file}")
 
-    @command('parsed')
+    @videos.command()
+    def filename(self):
+        """Print videos file name."""
+        print(self.downloader.videos_filename)
+
+    @videos.command('parsed')
     def parsed(self):
         """Print all the parsed videos tasks urls to download."""
         print("Parsed videos:")
         for i, video in enumerate(self.downloader.parsed_videos):
             print(f"* {i}: {video}")
 
-    @command('clear', 'tasks')
-    def clear_tasks(self):
-        """Clear the videos tasks of the downloader."""
-        del self.downloader.videos
-
-    @command('clear', 'videos')
-    def clear_videos(self):
+    @videos.command()
+    def clear(self):
         """Remove all the files in the videos folder."""
         for file in os.listdir(self.downloader.videos_folder):
-            os.remove(file)
+            path = os.path.join(self.downloader.videos_folder, file)
+            os.remove(path)
 
-    @command('clean', 'videos')
-    def clean_videos(self):
+    @videos.command()
+    def clean(self):
         """Remove all the caches or files that are not videos or musics in the videos folder."""
-        raise NotImplemented
-        # for file in os.listdir(self.downloader.videos_folder):
-        #     os.remove(file)
+        for file in os.listdir(self.downloader.videos_folder):
+            if not file.endswith('mp3') and not file.endswith('mp4'):
+                path = os.path.join(self.downloader.videos_folder, file)
+                os.remove(path)
 
     @command()
     def task(self):
         """Group of task commands."""
-        print("tasks")
+        print("Tasks:")
+        for i, video in enumerate(self.downloader.videos):
+            print(f"* {i}: {video}")
 
     @task.command()
-    def add(self, video):
-        """Add a task."""
-        self.downloader.videos = self.downloader.videos + [video]
+    def add(self, *videos:str):
+        """Add some tasks."""
+        self.downloader.videos = self.downloader.videos + list(videos)
 
     @task.command(aliases=['rm'])
-    def remove(self, *numbers):
+    def remove(self, *numbers:int):
         """Remove some tasks given their numbers."""
-        for number in sorted(numbers, reverse=True):
-            pass
+        for number in sorted(map(int, numbers), reverse=True):
+            videos = self.downloader.videos
+            del videos[number]
+            self.downloader.videos = videos
 
+    @task.command()
+    def clear(self):
+        """Clear the videos tasks of the downloader."""
+        del self.downloader.videos
 
-        
-
-
-
-        
-
-        # elif sys.argv[1] == "filename":
-        #     if len(sys.argv) == 3:
-        #         self.downloader.videos_filename = sys.argv[2]
-        #     else:
-        #         print(self.downloader.videos_filename)
-
+    @task.command()
+    def number(self):
+        """Print the number of videos to be downloaded."""
+        print(len(self.downloader.videos))
